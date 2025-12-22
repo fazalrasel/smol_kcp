@@ -5,7 +5,6 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-use async_io::Async;
 use kcp::{Kcp, KcpResult};
 use log::trace;
 
@@ -14,7 +13,7 @@ use crate::config::KcpConfig;
 /// KCP socket implementation
 pub struct KcpSocket {
     kcp: Kcp<KcpOutput>,
-    udp: Arc<Async<std::net::UdpSocket>>,
+    udp: Arc<smol::net::UdpSocket>,
     peer_addr: SocketAddr,
     last_update: Instant,
 }
@@ -23,7 +22,7 @@ impl KcpSocket {
     pub fn new(
         config: &KcpConfig,
         conv: u32,
-        udp: Arc<Async<std::net::UdpSocket>>,
+        udp: Arc<smol::net::UdpSocket>,
         peer_addr: SocketAddr,
         _stream: bool,
     ) -> KcpResult<Self> {
@@ -82,33 +81,37 @@ impl KcpSocket {
         self.kcp.flush()
     }
 
-    pub fn udp_socket(&self) -> &Arc<Async<std::net::UdpSocket>> {
+    pub fn udp_socket(&self) -> &Arc<smol::net::UdpSocket> {
         &self.udp
     }
 }
 
 /// KCP output implementation
 struct KcpOutput {
-    udp: Arc<Async<std::net::UdpSocket>>,
+    udp: Arc<smol::net::UdpSocket>,
     peer_addr: SocketAddr,
 }
 
 impl KcpOutput {
-    fn new(udp: Arc<Async<std::net::UdpSocket>>, peer_addr: SocketAddr) -> Self {
+    fn new(udp: Arc<smol::net::UdpSocket>, peer_addr: SocketAddr) -> Self {
         Self { udp, peer_addr }
     }
 }
 
 impl Write for KcpOutput {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        // Use blocking send for simplicity in this minimal implementation
-        match self.udp.get_ref().send_to(buf, self.peer_addr) {
-            Ok(n) => {
-                trace!("UDP sent {} bytes to {}", n, self.peer_addr);
-                Ok(n)
+        // Use blocking send_to - this is fine for KCP output
+        // In a real async implementation, we'd need to handle this differently
+        // but for simplicity and router compatibility, blocking is acceptable
+        futures_lite::future::block_on(async {
+            match self.udp.send_to(buf, self.peer_addr).await {
+                Ok(n) => {
+                    trace!("UDP sent {} bytes to {}", n, self.peer_addr);
+                    Ok(n)
+                }
+                Err(e) => Err(e),
             }
-            Err(e) => Err(e),
-        }
+        })
     }
 
     fn flush(&mut self) -> io::Result<()> {

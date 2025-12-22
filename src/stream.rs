@@ -6,11 +6,10 @@ use std::{
     pin::Pin,
 };
 
-use async_io::Async;
-use async_std::sync::Mutex;
 use futures_lite::io::{AsyncRead, AsyncWrite};
 use kcp::{Error as KcpError, KcpResult};
 use log::trace;
+use smol::lock::Mutex;
 
 use crate::{config::KcpConfig, socket::KcpSocket};
 
@@ -30,9 +29,9 @@ impl KcpStream {
             IpAddr::V6(_) => "[::]:0",
         };
 
-        let udp = std::net::UdpSocket::bind(udp_addr)?;
-        udp.connect(addr)?;
-        let udp = Arc::new(Async::new(udp)?);
+        let udp = smol::net::UdpSocket::bind(udp_addr).await?;
+        udp.connect(addr).await?;
+        let udp = Arc::new(udp);
 
         let mut conv = rand::random::<u32>();
         while conv == 0 {
@@ -128,7 +127,7 @@ impl KcpStream {
     /// Get local address
     pub async fn local_addr(&self) -> io::Result<SocketAddr> {
         let socket = self.socket.lock().await;
-        socket.udp_socket().get_ref().local_addr()
+        socket.udp_socket().local_addr()
     }
 
     /// Get peer address

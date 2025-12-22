@@ -5,16 +5,15 @@ use std::{
     sync::Arc,
 };
 
-use async_io::Async;
-use async_std::sync::Mutex;
 use kcp::KcpResult;
 use log::{debug, error, trace};
+use smol::lock::Mutex;
 
 use crate::{config::KcpConfig, socket::KcpSocket, stream::KcpStream};
 
 /// KCP listener for accepting connections
 pub struct KcpListener {
-    udp: Arc<Async<std::net::UdpSocket>>,
+    udp: Arc<smol::net::UdpSocket>,
     config: KcpConfig,
     sessions: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<KcpSocket>>>>>,
 }
@@ -22,8 +21,8 @@ pub struct KcpListener {
 impl KcpListener {
     /// Bind to an address
     pub async fn bind(config: KcpConfig, addr: SocketAddr) -> KcpResult<Self> {
-        let udp = std::net::UdpSocket::bind(addr)?;
-        let udp = Arc::new(Async::new(udp)?);
+        let udp = smol::net::UdpSocket::bind(addr).await?;
+        let udp = Arc::new(udp);
 
         Ok(Self {
             udp,
@@ -34,9 +33,8 @@ impl KcpListener {
 
     /// Accept a new connection
     pub async fn accept(&mut self) -> KcpResult<(KcpStream, SocketAddr)> {
-        let mut buf = vec![0u8; 65536];
-
         loop {
+            let mut buf = vec![0u8; 65536];
             let (n, peer_addr) = self.udp.recv_from(&mut buf).await?;
             
             if n < kcp::KCP_OVERHEAD {
@@ -103,6 +101,6 @@ impl KcpListener {
 
     /// Get local address
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.udp.get_ref().local_addr()
+        self.udp.local_addr()
     }
 }
