@@ -1,0 +1,30 @@
+[package]
+name = "smol-kcp"
+version = "0.1.0"
+edition = "2021"
+description = "A lightweight KCP implementation using smol async runtime"
+license = "MIT"
+keywords = ["kcp", "udp", "reliable", "smol", "async"]
+
+[dependencies]
+smol = "2.0"
+async-io = "2.3"
+futures-lite = "2.3"
+kcp = "0.5.3"
+log = "0.4"
+bytes = "1.1"
+rand = "0.8"
+env_logger = "0.11"
+async-std = { version = "1.12", features = ["attributes"] }
+
+[[example]]
+name = "server"
+path = "examples/server.rs"
+
+[[example]]
+name = "client"
+path = "examples/client.rs"
+
+[[example]]
+name = "simple_test"
+path = "examples/simple_test.rs"
