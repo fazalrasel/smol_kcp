@@ -6,10 +6,11 @@ use std::{
     pin::Pin,
 };
 
+use async_io::Async;
+use async_lock::Mutex;
 use futures_lite::io::{AsyncRead, AsyncWrite};
 use kcp::{Error as KcpError, KcpResult};
 use log::trace;
-use smol::lock::Mutex;
 
 use crate::{config::KcpConfig, socket::KcpSocket};
 
@@ -29,9 +30,9 @@ impl KcpStream {
             IpAddr::V6(_) => "[::]:0",
         };
 
-        let udp = smol::net::UdpSocket::bind(udp_addr).await?;
-        udp.connect(addr).await?;
-        let udp = Arc::new(udp);
+        let udp = std::net::UdpSocket::bind(udp_addr)?;
+        udp.connect(addr)?;
+        let udp = Arc::new(Async::new(udp)?);
 
         let mut conv = rand::random::<u32>();
         while conv == 0 {
@@ -119,15 +120,15 @@ impl KcpStream {
             // No data available, need to wait for input
             drop(socket);
             
-            // Simple polling approach - in a real implementation you'd want proper async waiting
-            smol::Timer::after(std::time::Duration::from_millis(1)).await;
+            // Simple polling approach with async delay
+            futures_lite::future::yield_now().await;
         }
     }
 
     /// Get local address
     pub async fn local_addr(&self) -> io::Result<SocketAddr> {
         let socket = self.socket.lock().await;
-        socket.udp_socket().local_addr()
+        socket.udp_socket().get_ref().local_addr()
     }
 
     /// Get peer address

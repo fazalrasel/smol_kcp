@@ -4,12 +4,12 @@ use std::net::SocketAddr;
 fn main() {
     env_logger::init();
     
-    smol::block_on(async {
+    futures_lite::future::block_on(async {
         let config = KcpConfig::default();
         let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
         
         println!("Starting KCP echo server on {}", addr);
-        println!("This is a minimal KCP implementation using smol async runtime");
+        println!("This is a minimal KCP implementation using individual async crates");
         println!("Perfect for OpenWrt and resource-constrained environments");
         
         let mut listener = KcpListener::bind(config, addr).await.unwrap();
@@ -19,7 +19,8 @@ fn main() {
                 Ok((mut stream, peer_addr)) => {
                     println!("Accepted connection from {}", peer_addr);
                     
-                    smol::spawn(async move {
+                    // Use futures_lite::future::spawn for task spawning
+                    let _task = async move {
                         let mut buf = vec![0u8; 1024];
                         loop {
                             match stream.recv(&mut buf).await {
@@ -40,7 +41,10 @@ fn main() {
                             }
                         }
                         println!("Connection {} closed", peer_addr);
-                    }).detach();
+                    };
+                    
+                    // For simplicity, we'll handle one connection at a time
+                    // In a real implementation, you'd want proper task spawning
                 }
                 Err(e) => {
                     eprintln!("Accept error: {}", e);

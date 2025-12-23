@@ -5,13 +5,18 @@ use std::time::Duration;
 fn main() {
     env_logger::init();
     
-    smol::block_on(async {
+    futures_lite::future::block_on(async {
         let config = KcpConfig::default();
         let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
         
-        // Start server
-        let server_task = smol::spawn(async move {
-            let mut listener = KcpListener::bind(config, addr).await.unwrap();
+        println!("Starting simple KCP test...");
+        
+        // For embedded systems, we'll run a simpler sequential test
+        // Create server and client futures without spawning tasks
+        let server_config = config.clone();
+        
+        let server_future = async move {
+            let mut listener = KcpListener::bind(server_config, addr).await.unwrap();
             println!("Server listening on {}", addr);
             
             let (mut stream, peer_addr) = listener.accept().await.unwrap();
@@ -27,13 +32,12 @@ fn main() {
                 }
                 Err(e) => eprintln!("Server receive error: {}", e),
             }
-        });
+        };
         
-        // Give server time to start
-        smol::Timer::after(Duration::from_millis(100)).await;
-        
-        // Start client
-        let client_task = smol::spawn(async move {
+        let client_future = async move {
+            // Give server time to start
+            async_io::Timer::after(Duration::from_millis(100)).await;
+            
             let mut stream = KcpStream::connect(&config, addr).await.unwrap();
             println!("Client: connected to server");
             
@@ -49,10 +53,10 @@ fn main() {
                 }
                 Err(e) => eprintln!("Client receive error: {}", e),
             }
-        });
+        };
         
-        // Wait for both tasks
-        let _ = futures_lite::future::zip(server_task, client_task).await;
+        // Run both futures concurrently using futures_lite
+        futures_lite::future::zip(server_future, client_future).await;
         
         println!("Test completed");
     });

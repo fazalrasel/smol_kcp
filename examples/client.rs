@@ -5,7 +5,7 @@ use std::time::Duration;
 fn main() {
     env_logger::init();
     
-    smol::block_on(async {
+    futures_lite::future::block_on(async {
         let config = KcpConfig::default();
         let server_addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
         
@@ -26,7 +26,7 @@ fn main() {
                 }
                 
                 // Add a small delay to allow server to process
-                smol::Timer::after(Duration::from_millis(500)).await;
+                async_io::Timer::after(Duration::from_millis(500)).await;
                 
                 let mut buf = vec![0u8; 1024];
                 
@@ -40,7 +40,7 @@ fn main() {
                         }
                         Err(e) => {
                             eprintln!("Receive error on attempt {}: {}", attempt, e);
-                            smol::Timer::after(Duration::from_millis(200)).await;
+                            async_io::Timer::after(Duration::from_millis(200)).await;
                         }
                     }
                 }
